@@ -10,24 +10,25 @@ void main()
 	IWICImagingFactory* pWICFactory = NULL;
 	CoCreateInstance(CLSID_WICImagingFactory1,NULL,CLSCTX_ALL,IID_PPV_ARGS(&pWICFactory));
 
-	PBYTE p = (PBYTE)malloc(PROJECTION_CLIENT_MAX_IMAGE_BUF_SIZE); //RAW图像数据
-	HANDLE hUsbBusDev = FindFirstUsbBusDev(); //查找USB设备（WP手机）
-	if (hUsbBusDev) //如果存在USB设备
+	PBYTE p;
+	HANDLE hUsbBusDev = FindFirstUsbBusDev(); //夌泀USB晥塛丒WP曉帤丒
+	if (hUsbBusDev) //斿崨婁氊USB晥塛
 	{
 		WCHAR szDevPath[MAX_PATH] = {};
-		FindUsbBusGetDevPath(hUsbBusDev,szDevPath,ARRAYSIZE(szDevPath)); //取得第一个USB设备路径，可Next查找下个
-		FindUsbBusClose(hUsbBusDev); //关闭查找
+		FindUsbBusGetDevPath(hUsbBusDev,szDevPath,ARRAYSIZE(szDevPath)); //敓媌媦櫣岕USB晥塛懙彺丒恏Next夌泀榓岕
+		FindUsbBusClose(hUsbBusDev); //峸塼夌泀
 		if (wcslen(szDevPath) > 0)
 		{
-			HANDLE h = InitWinPhoneProjectionClient(szDevPath); //初始化投影（WP手机会出现通知）
+			HANDLE h = InitWinPhoneProjectionClient(szDevPath); //姇暫嶯桿歄丒WP曉帤巵姈丒桮洦丒
 			if (h)
 			{
 				_FOREVER_LOOP{
-					if (!ReadWinPhoneScreenImageAsync(h)) //发送读请求
+					if (!ReadWinPhoneScreenImageAsync(h)) //孉杔嬁攱敁
 						break;
 					UINT nWidth = 0,nHeight = 0,nOrientation = WP_SCR_ORI_DEFAULT;
 					DWORD dwImageBits = 0;
-					if (!WaitWinPhoneScreenImageComplete(h,PROJECTION_CLIENT_MAX_IMAGE_BUF_SIZE,p,&nWidth,&nHeight,&dwImageBits,&nOrientation)) //等待数据读取完成
+					DWORD dwSrtride = 0;
+					if (!WaitWinPhoneScreenImageComplete(h,&p,&nWidth,&nHeight,&dwImageBits,&dwSrtride,&nOrientation)) //媑婝曽徾嬁敓棅奾
 						break;
 					CHAR szBuffer[MAX_PATH] = {};
 					wsprintfA(szBuffer,"Image Accept:%d x %d,%d Bits,Orientation:%d",nWidth,nHeight,dwImageBits,nOrientation);
@@ -64,12 +65,11 @@ void main()
 					pBitmap->Release();
 					*/
 				}
-				FreeWinPhoneProjectionClient(h); //释放投影客户端
+				FreeWinPhoneProjectionClient(h); //曀宒桿歄恖嶧嬌
 			}
 		}
 	}
 	pWICFactory->Release();
-	free(p);
 	CoUninitialize();
 	ExitProcess(0);
 }

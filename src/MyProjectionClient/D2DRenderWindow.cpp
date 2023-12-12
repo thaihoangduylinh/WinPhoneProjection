@@ -12,24 +12,25 @@ CD2DRenderWindow::CD2DRenderWindow(HWND hWnd)
 CD2DRenderWindow::~CD2DRenderWindow()
 {
 	DeleteCriticalSection(&cs);
+	ResetWinPhoneProjectionClient(hProjectionClient);
 	if (hThreadReader)
 	{
-		TerminateThread(hThreadReader,-1);
-		WaitForSingleObject(hThreadReader,INFINITE);
+		//TerminateThread(hThreadReader,-1);
+		WaitForSingleObject(hThreadReader, INFINITE);
 		CloseHandle(hThreadReader);
-	}
-	if (hThreadRender)
-	{
-		TerminateThread(hThreadRender,-1);
-		WaitForSingleObject(hThreadRender,INFINITE);
-		CloseHandle(hThreadRender);
+		hThreadReader = NULL;
 	}
 	if (hSyncEvent)
 		CloseHandle(hSyncEvent);
+	if (hThreadRender)
+	{
+		//TerminateThread(hThreadRender,-1);
+		WaitForSingleObject(hThreadRender, INFINITE);
+		CloseHandle(hThreadRender);
+		hThreadRender = NULL;
+	}
 	if (hProjectionClient)
 		FreeWinPhoneProjectionClient(hProjectionClient);
-	if (pBufOfRaw)
-		free(pBufOfRaw);
 	if (pBufOfConverted)
 		free(pBufOfConverted);
 	SAFE_RELEASE(pRawBitmap);
@@ -58,37 +59,53 @@ BOOL CD2DRenderWindow::Initialize(LPWSTR lpstrUsbVid)
 		lastHR = E_POINTER;
 		return FALSE;
 	}
-	if (FAILED(CoCreateInstance(CLSID_WICImagingFactory1,NULL,CLSCTX_ALL,IID_PPV_ARGS(&pWICFactory))))
+	if (pWICFactory == NULL)
 	{
-		lastHR = E_FAIL;
-		return FALSE;
+		if (FAILED(CoCreateInstance(CLSID_WICImagingFactory1, NULL, CLSCTX_ALL, IID_PPV_ARGS(&pWICFactory))))
+		{
+			lastHR = E_FAIL;
+			return FALSE;
+		}
 	}
-	if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED,&pD2DFactory)))
+	if (pD2DFactory == NULL)
 	{
-		lastHR = E_ABORT;
-		return FALSE;
+		if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, &pD2DFactory)))
+		{
+			lastHR = E_ABORT;
+			return FALSE;
+		}
+		pD2DFactory->CreateHwndRenderTarget(&D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE)),
+			&D2D1::HwndRenderTargetProperties(hRender, D2D1::SizeU()),
+			&pRender);
+		if (hRender == NULL)
+		{
+			lastHR = E_DRAW;
+			return FALSE;
+		}
+		pRender->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
 	}
-	pD2DFactory->CreateHwndRenderTarget(&D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT,D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM,D2D1_ALPHA_MODE_IGNORE)),
-		   &D2D1::HwndRenderTargetProperties(hRender,D2D1::SizeU()),
-		   &pRender);
-	if (hRender == NULL)
-	{
-		lastHR = E_DRAW;
-		return FALSE;
-	}
+	if (hProjectionClient)
+		FreeWinPhoneProjectionClient(hProjectionClient);
 	hProjectionClient = InitWinPhoneProjectionClient(lpstrUsbVid);
 	if (hProjectionClient == NULL)
 	{
 		lastHR = E_UNEXPECTED;
 		return FALSE;
 	}
-	pRender->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
-	hSyncEvent = CreateEventW(NULL,FALSE,FALSE,NULL);
-	pBufOfRaw = (PBYTE)malloc(PROJECTION_CLIENT_MAX_IMAGE_BUF_SIZE);
-	hThreadReader = CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)&CD2DRenderWindow::_StaticReaderThread,this,0,NULL);
-	hThreadRender = CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)&CD2DRenderWindow::_StaticRenderThread,this,0,NULL);
-	SetThreadPriority(hThreadReader,THREAD_PRIORITY_HIGHEST);
-	SetThreadPriority(hThreadRender,THREAD_PRIORITY_TIME_CRITICAL);
+	if (hSyncEvent == NULL)
+	{
+		hSyncEvent = CreateEventW(NULL, FALSE, FALSE, NULL);
+	}
+	if (hThreadReader == NULL)
+	{
+		hThreadReader = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&CD2DRenderWindow::_StaticReaderThread, this, 0, NULL);
+		SetThreadPriority(hThreadReader, THREAD_PRIORITY_HIGHEST);
+	}
+	if (hThreadRender == NULL)
+	{
+		hThreadRender = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&CD2DRenderWindow::_StaticRenderThread, this, 0, NULL);
+		SetThreadPriority(hThreadRender, THREAD_PRIORITY_TIME_CRITICAL);
+	}
 	return TRUE;
 }
 
@@ -122,8 +139,27 @@ BOOL CD2DRenderWindow::Resume()
 	return TRUE;
 }
 
-BOOL CD2DRenderWindow::MoveWindow(int x,int y,DWORD dwWidth,DWORD dwHeight)
+BOOL CD2DRenderWindow::MoveWindow(int x,int y,DWORD dwWidth,DWORD dwHeight, BOOL bRecalc)
 {
+	if (bRecalc) {
+		UINT rWidth, rHeight;
+		if (ForceOrientation == WP_ProjectionScreenOrientation_Hori_KeyBack || ForceOrientation == WP_ProjectionScreenOrientation_Hori_KeySearch) {
+			rWidth = nHeight;
+			rHeight = nWidth;
+		}
+		else {
+			rWidth = nWidth;
+			rHeight = nHeight;
+		}
+		if (dwWidth * rHeight > rWidth * dwHeight) {
+			dwWidth = dwHeight * rWidth / rHeight;
+			InvalidateRect(GetParent(hRender), NULL, TRUE);
+		}
+		else if (dwWidth * rHeight < rWidth * dwHeight) {
+			dwHeight = dwWidth * rHeight / rWidth;
+			InvalidateRect(GetParent(hRender), NULL, TRUE);
+		}
+	}
 	return ::MoveWindow(hRender,x,y,dwWidth,dwHeight,TRUE);
 }
 
@@ -144,6 +180,10 @@ BOOL CD2DRenderWindow::ForceChangeOrientation(WP81ProjectionScreenOrientation or
 		pRender->Resize(D2D1::SizeU(nWidth,nHeight));
 		pRender->SetTransform(D2D1::Matrix3x2F::Rotation(0));
 	}
+	ForceOrientation = ori;
+	if (ForceOrientation == WP_ProjectionScreenOrientation_Default) {
+		ForceOrientation = WP_ProjectionScreenOrientation_Normal;
+	}
 	LeaveCriticalSection(&cs);
 	return TRUE;
 }
@@ -151,15 +191,24 @@ BOOL CD2DRenderWindow::ForceChangeOrientation(WP81ProjectionScreenOrientation or
 UINT CD2DRenderWindow::ReaderThread()
 {
 	_FOREVER_LOOP{
-		if (!SyncReadWP16BitScreenImageWithWICBitmap(hProjectionClient,pBufOfRaw,&Orientation,pWICFactory,&pRawBitmap,TRUE))
+		if (!SyncReadWP16BitScreenImageWithWICBitmap(hProjectionClient,&Orientation,pWICFactory,&pRawBitmap,TRUE))
 		{
+			if (pRawBitmap)
+			{
+				pRawBitmap->Release();
+				pRawBitmap = NULL;
+			}
+			CloseHandle(hSyncEvent);
+			hSyncEvent = NULL;
+			hThreadReader = NULL;
 			PostMessageW(GetParent(hRender),WM_WP81_PC_HANGUP,NULL,NULL);
 			break;
 		}
-		if (nWidth == 0)
-			pRawBitmap->GetSize(&nWidth,&nHeight);
-		if (pRawBitmap)
+		if (pRawBitmap) {
+			if (nWidth == 0)
+				pRawBitmap->GetSize(&nWidth, &nHeight);
 			SetEvent(hSyncEvent);
+		}
 	}
 	return NULL;
 }
@@ -205,7 +254,8 @@ UINT CD2DRenderWindow::RenderThread()
 	HANDLE hAvTask = AvSetMmThreadCharacteristicsW(L"Low Latency",&dwAvTaskIndex);
 	AvSetMmThreadPriority(hAvTask,AVRT_PRIORITY_CRITICAL);
 	_FOREVER_LOOP{
-		if (WaitForSingleObject(hSyncEvent,INFINITE) == WAIT_OBJECT_0)
+		DWORD ret = WaitForSingleObject(hSyncEvent, 1000);
+		if (ret == WAIT_OBJECT_0)
 		{
 			if (nWidth == 0 || nHeight == 0)
 				continue;
@@ -250,25 +300,54 @@ UINT CD2DRenderWindow::RenderThread()
 			}
 			pRenderBitmap->Release();
 		}
+		else if (ret != WAIT_TIMEOUT){
+			break;
+		}
 	}
 	AvRevertMmThreadCharacteristics(hAvTask);
+	hThreadRender = NULL;
 	return NULL;
 }
 
 LRESULT CD2DRenderWindow::WndProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARAM lParam)
 {
-	if (uMsg == WM_PAINT)
+	switch (uMsg)
+	{
+	case WM_PAINT:
 	{
 		PAINTSTRUCT ps;
-		HDC hDC = BeginPaint(hWnd,&ps);
+		HDC hDC = BeginPaint(hWnd, &ps);
 		HBRUSH hBursh = CreateSolidBrush(0);
 		RECT rc;
-		GetClientRect(hWnd,&rc);
-		FillRect(hDC,&rc,hBursh);
+		GetClientRect(hWnd, &rc);
+		FillRect(hDC, &rc, hBursh);
 		DeleteObject(hBursh);
-		EndPaint(hWnd,&ps);
+		EndPaint(hWnd, &ps);
+	}
+		break;
+	case WM_POINTERDOWN:
+	case WM_POINTERUP:
+	case WM_POINTERUPDATE:
+	{
+		POINT pos;
+		RECT rect;
+		SIZE sz;
+		pos.x = LOWORD(lParam);
+		pos.y = HIWORD(lParam);
+		ScreenToClient(hWnd, &pos);
+		GetClientRect(hWnd, &rect);
+		sz.cx = rect.right - rect.left;
+		sz.cy = rect.bottom - rect.top;
+		SendWinPhoneTouchEvent(hProjectionClient, uMsg, wParam, MAKELONG(pos.x, pos.y), MAKELONG(sz.cx, sz.cy), ForceOrientation);
+	}
+		return 0;
 	}
 	return DefWindowProcW(hWnd,uMsg,wParam,lParam);
+}
+BOOL CD2DRenderWindow::SendKey(UINT uMsg, WPARAM vkey)
+{
+	SendWinPhoneTouchEvent(hProjectionClient, uMsg, vkey, 0, 0, 0);
+	return TRUE;
 }
 
 VOID CALLBACK CD2DRenderWindow::_StaticReaderThread(PVOID p)

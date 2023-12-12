@@ -43,7 +43,7 @@ HMENU MainMenu;
 HMENU hMenuDevice,hMenuDisplay,hMenuCapture,hMenuHelper;
 DWORD dwImageWidth,dwImageHeight;
 UINT nDevCount;
-LPWSTR* ppstrDevPath;
+LPWSTR ppstrDevPath[32];
 BOOL bPlayState = TRUE;
 BOOL bExitVideoRec = FALSE;
 WP81ProjectionScreenOrientation ForceOrientation = WP_ProjectionScreenOrientation_Default,CurrentOrientation = WP_ProjectionScreenOrientation_Default;
@@ -163,8 +163,8 @@ DECLSPEC_NOINLINE BOOL GetOpenSaveDialogFileName(HWND hWnd,LPCWSTR lpszItemDesc,
 
 LRESULT CALLBACK RenderWindowMessageProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARAM lParam)
 {
-	if (uMsg == WM_LBUTTONDBLCLK)
-		SendMessageW(GetParent(hWnd),WM_KEYDOWN,VK_SPACE,NULL);
+	//if (uMsg == WM_LBUTTONDBLCLK)
+	//	SendMessageW(GetParent(hWnd),WM_KEYDOWN,VK_SPACE,NULL);
 	if (uMsg == WM_PAINT)
 	{
 		PAINTSTRUCT ps;
@@ -183,6 +183,62 @@ LRESULT CALLBACK RenderWindowMessageProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARA
 		return DefWindowProcW(hWnd,uMsg,wParam,lParam);
 	}
 	return CallWindowProcW(RenderWindowProc,hWnd,uMsg,wParam,lParam);
+}
+
+void SetupDeviceMenu()
+{
+	WCHAR szBuffer[MAX_PATH] = {};
+	HICON hPhoneIcon = (HICON)LoadImage(GetModuleHandleA(CORE_LIB_FILE_NAME), MAKEINTRESOURCE(100), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR);
+	HBITMAP hPhoneBitmap = HBitmapFromHIcon32bpp(hPhoneIcon);
+
+	nDevCount = 0;
+	RtlZeroMemory(szBuffer, ARRAYSIZE(szBuffer));
+	HANDLE hFindUsb = FindFirstUsbBusDev();
+	if (hFindUsb)
+	{
+		do {
+			if (FindUsbBusGetDevPath(hFindUsb, szBuffer, ARRAYSIZE(szBuffer)))
+			{
+				if (!FindUsbBusGetDisplayName(hFindUsb, szBuffer, ARRAYSIZE(szBuffer)))
+				{
+					if (nDevCount == 0)
+						lstrcpyW(szBuffer, L"Windows Phone");
+					else
+						wsprintfW(szBuffer, L"Windows Phone %d", nDevCount + 1);
+				}
+				LPWSTR lpstrDevPath = (LPWSTR)GlobalAlloc(GPTR, MAX_PATH * 2);
+				FindUsbBusGetDevPath(hFindUsb, lpstrDevPath, MAX_PATH);
+				ppstrDevPath[nDevCount] = lpstrDevPath;
+				AppendMenuW(hMenuDevice, MF_BYCOMMAND, MENU_CMD_PHONE_DEVICE_SELECT + nDevCount, szBuffer);
+				if (hPhoneBitmap)
+					SetMenuItemBitmaps(hMenuDevice, MENU_CMD_PHONE_DEVICE_SELECT + nDevCount, MF_BYCOMMAND, hPhoneBitmap, hPhoneBitmap);
+				nDevCount++;
+				if (nDevCount > 30)
+					break;
+			}
+		} while (FindNextUsbBusDev(hFindUsb));
+		FindUsbBusClose(hFindUsb);
+
+		if (nDevCount == 1) //one phone.
+			SetMenuDefaultItem(hMenuDevice, 0, MF_BYPOSITION);
+		else if (nDevCount == 0)
+			AppendMenuA(hMenuDevice, MF_BYCOMMAND | MF_GRAYED, 0, "Device Not Detected.");
+	}
+
+	AppendMenuA(hMenuDevice, MF_BYPOSITION, 0, NULL);
+	AppendMenuA(hMenuDevice, MF_BYCOMMAND, MENU_CMD_EXIT, "Exit");
+}
+void ReleaseDeviceMenu()
+{
+	for (UINT i = 0; i < nDevCount; i++)
+	{
+		DeleteMenu(hMenuDevice, i, MF_BYPOSITION);
+		GlobalFree(ppstrDevPath[i]);
+	}
+	DeleteMenu(hMenuDevice, 0, MF_BYPOSITION);
+	DeleteMenu(hMenuDevice, 0, MF_BYPOSITION);
+	DeleteMenu(hMenuDevice, 0, MF_BYPOSITION);
+	nDevCount = 0;
 }
 
 LRESULT CALLBACK MainWindowMessageProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARAM lParam)
@@ -220,10 +276,10 @@ LRESULT CALLBACK MainWindowMessageProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARAM 
 	case WM_WINDOWPOSCHANGING:
 	case WM_WINDOWPOSCHANGED:
 		GetClientRect(hWnd,&rc);
-		RenderWindow->MoveWindow(0,0,rc.right,rc.bottom);
+		RenderWindow->MoveWindow(0,0,rc.right,rc.bottom, TRUE);
 		break;
 	case WM_KEYDOWN:
-		if (wParam == VK_SPACE)
+		/*if (wParam == VK_SPACE)
 		{
 			if (bPlayState)
 			{
@@ -233,6 +289,19 @@ LRESULT CALLBACK MainWindowMessageProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARAM 
 				 bPlayState = TRUE;
 				 RenderWindow->Resume();
 			}
+		}*/
+		if ((wParam == VK_BACK) || (wParam == VK_HOME))
+		{
+			if ((lParam & 0x40000000)==0)
+			{
+				RenderWindow->SendKey(uMsg, wParam);
+			}
+		}
+		break;
+	case WM_KEYUP:
+		if ((wParam == VK_BACK) || (wParam == VK_HOME))
+		{
+			RenderWindow->SendKey(uMsg, wParam);
 		}
 		break;
 	case WM_COMMAND:
@@ -415,13 +484,7 @@ LRESULT CALLBACK MainWindowMessageProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARAM 
 			WCHAR szDevPath[MAX_PATH] = {},szDevName[MAX_PATH] = {};
 			lstrcpyW(szDevPath,ppstrDevPath[nIndex]);
 			GetMenuStringW(hMenuDevice,nIndex,szDevName,ARRAYSIZE(szDevName),MF_BYPOSITION);
-			for (UINT i = 0;i < nDevCount;i++)
-			{
-				DeleteMenu(hMenuDevice,i,MF_BYPOSITION);
-				GlobalFree(ppstrDevPath[i]);
-			}
-			GlobalFree(ppstrDevPath);
-			DeleteMenu(hMenuDevice,0,MF_BYPOSITION);
+			ReleaseDeviceMenu();
 			if (RenderWindow->Initialize(szDevPath))
 			{
 				lpszPhoneDevName = StrDupW(szDevName);
@@ -446,8 +509,13 @@ LRESULT CALLBACK MainWindowMessageProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARAM 
 		break;
 	case WM_WP81_PC_HANGUP:
 		KillTimer(hWnd,0);
-		ShellMessageBoxA(GetModuleHandle(NULL),hWnd,"Device has been disconnected!","Warning",MB_ICONERROR);
-		PostMessageW(hWnd,WM_CLOSE,NULL,NULL);
+		//ShellMessageBoxA(GetModuleHandle(NULL),hWnd,"Device has been disconnected!","Warning",MB_ICONERROR);
+		//PostMessageW(hWnd,WM_CLOSE,NULL,NULL);
+		free(lpszPhoneDevName);
+		lpszPhoneDevName = NULL;
+		InvalidateRect(hWnd, NULL, TRUE);
+		Sleep(500);
+		SetupDeviceMenu();
 		break;
 	case WM_WP81_PC_SHOW:
 		OutputDebugStringA("Show Screen Projection Image.");
@@ -458,6 +526,8 @@ LRESULT CALLBACK MainWindowMessageProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARAM 
 		ulTickCountOK = GetTickCount64();
 		dwImageWidth = wParam;
 		dwImageHeight = lParam;
+		MoveWindowClientArea(hWnd, dwImageWidth, dwImageHeight);
+		RenderWindow->MoveWindow(0, 0, dwImageWidth, dwImageHeight);
 		if (IsKeyCLSIDExists(L"{4BE8D3C0-0515-4A37-AD55-E4BAE19AF471}")) //Intel QuickSync Supported.
 			PostMessageW(hWnd,WM_COMMAND,MENU_CMD_CAPTURE_TO_VIDEO_FILE_USE_HARDWARE,NULL);
 		break;
@@ -482,6 +552,16 @@ LRESULT CALLBACK MainWindowMessageProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARAM 
 			}
 		}
 		break;
+	case WM_DEVICECHANGE:
+		if ((lpszPhoneDevName == NULL) && (nDevCount == 0)) {
+			ReleaseDeviceMenu();
+			SetupDeviceMenu();
+			if (nDevCount == 1) //one phone.
+			{
+				PostMessage(MainWindow, WM_COMMAND, MENU_CMD_PHONE_DEVICE_SELECT, NULL);
+			}
+		}
+		break;
 	}
 	return DefWindowProcW(hWnd,uMsg,wParam,lParam);
 }
@@ -492,8 +572,6 @@ void true_main(int nCmdShow)
 	WCHAR szBuffer[MAX_PATH] = {};
 	SHGetSpecialFolderPathW(NULL,szBuffer,CSIDL_PROGRAM_FILESX86,FALSE);
 	PathAppendW(szBuffer,L"Windows Media Player\\setup_wm.exe");
-	HICON hPhoneIcon = (HICON)LoadImage(GetModuleHandleA(CORE_LIB_FILE_NAME),MAKEINTRESOURCE(100),IMAGE_ICON,16,16,LR_DEFAULTCOLOR);
-	HBITMAP hPhoneBitmap = HBitmapFromHIcon32bpp(hPhoneIcon);
 	HICON hWMPIcon = (HICON)LoadImage(LoadLibraryExW(szBuffer,NULL,LOAD_LIBRARY_AS_IMAGE_RESOURCE),MAKEINTRESOURCE(70),IMAGE_ICON,16,16,LR_DEFAULTCOLOR);
 	HBITMAP hWMPBitmap = HBitmapFromHIcon32bpp(hWMPIcon);
 
@@ -503,42 +581,6 @@ void true_main(int nCmdShow)
 	hMenuCapture = CreateMenu();
 	hMenuHelper = CreateMenu();
 
-	ppstrDevPath = (LPWSTR*)GlobalAlloc(GPTR,32 * sizeof(LPWSTR)); //max 32 items.
-	RtlZeroMemory(szBuffer,ARRAYSIZE(szBuffer));
-	HANDLE hFindUsb = FindFirstUsbBusDev();
-	if (hFindUsb)
-	{
-		do{
-			if (FindUsbBusGetDevPath(hFindUsb,szBuffer,ARRAYSIZE(szBuffer)))
-			{
-				if (!FindUsbBusGetDisplayName(hFindUsb,szBuffer,ARRAYSIZE(szBuffer)))
-				{
-					if (nDevCount == 0)
-						lstrcpyW(szBuffer,L"Windows Phone");
-					else
-						wsprintfW(szBuffer,L"Windows Phone %d",nDevCount + 1);
-				}
-				LPWSTR lpstrDevPath = (LPWSTR)GlobalAlloc(GPTR,MAX_PATH * 2);
-				FindUsbBusGetDevPath(hFindUsb,lpstrDevPath,MAX_PATH);
-				ppstrDevPath[nDevCount] = lpstrDevPath;
-				AppendMenuW(hMenuDevice,MF_BYCOMMAND,MENU_CMD_PHONE_DEVICE_SELECT + nDevCount,szBuffer);
-				if (hPhoneBitmap)
-					SetMenuItemBitmaps(hMenuDevice,MENU_CMD_PHONE_DEVICE_SELECT + nDevCount,MF_BYCOMMAND,hPhoneBitmap,hPhoneBitmap);
-				nDevCount++;
-				if (nDevCount > 30)
-					break;
-			}
-		}while (FindNextUsbBusDev(hFindUsb));
-		FindUsbBusClose(hFindUsb);
-
-		if (nDevCount == 1) //one phone.
-			SetMenuDefaultItem(hMenuDevice,0,MF_BYPOSITION);
-		else if (nDevCount == 0)
-			AppendMenuA(hMenuDevice,MF_BYCOMMAND|MF_GRAYED,0,"Device Not Detected.");
-	}
-
-	AppendMenuA(hMenuDevice,MF_BYPOSITION,0,NULL);
-	AppendMenuA(hMenuDevice,MF_BYCOMMAND,MENU_CMD_EXIT,"Exit");
 	AppendMenuA(hMenuDisplay,MF_BYCOMMAND,MENU_CMD_DISPLAY_AUTO,"Orientation: Auto");
 	AppendMenuA(hMenuDisplay,MF_BYCOMMAND,MENU_CMD_DISPLAY_NORMAL,"Orientation: Force to portrait up.");
 	AppendMenuA(hMenuDisplay,MF_BYCOMMAND,MENU_CMD_DISPLAY_HORI_LEFT,"Orientation: Force to landscape left.");
@@ -575,6 +617,12 @@ void true_main(int nCmdShow)
 	SendMessageW(MainWindow,WM_INITDIALOG,NULL,NULL);
 	ShowWindow(MainWindow,nCmdShow);
 	DestroyIcon(hIcon);
+
+	SetupDeviceMenu();
+	if (nDevCount == 1) //one phone.
+	{
+		PostMessage(MainWindow, WM_COMMAND, MENU_CMD_PHONE_DEVICE_SELECT, NULL);
+	}
 
 	MSG msg;
 	while (GetMessageW(&msg,NULL,0,0))

@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Release|ARM">
       <Configuration>Release</Configuration>
@@ -17,26 +17,27 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{2D83279C-3BB2-43EC-8503-8E62FB1F3A99}</ProjectGuid>
     <RootNamespace>WP81ProjectionClient</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -88,15 +89,17 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>kernel32.lib;shlwapi.lib;shell32.lib;ole32.lib;winusb.lib;setupapi.lib;mfplat.lib;</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;shlwapi.lib;shell32.lib;ole32.lib;winusb.lib;setupapi.lib;mfplat.lib;user32.lib;gdi32.lib</AdditionalDependencies>
       <EntryPointSymbol>
       </EntryPointSymbol>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
-      <AdditionalOptions>/EXPORT:CreateWP81ProjectionClient
+      <AdditionalOptions>
 /EXPORT:InitWinPhoneProjectionClient
 /EXPORT:FreeWinPhoneProjectionClient
+/EXPORT:ResetWinPhoneProjectionClient
 /EXPORT:ReadWinPhoneScreenImageAsync
 /EXPORT:WaitWinPhoneScreenImageComplete
+/EXPORT:SendWinPhoneTouchEvent
 /EXPORT:FindFirstUsbBusDev
 /EXPORT:FindNextUsbBusDev
 /EXPORT:FindUsbBusGetDevPath

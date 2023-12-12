@@ -1,12 +1,5 @@
 #include "WP81ProjectionClient.h"
 
-//Export Class Impl.
-EXTERN_C VOID WINAPI CreateWP81ProjectionClient(LPCWSTR lpstrUsbVid,void** ppv)
-{
-	if (lpstrUsbVid && ppv)
-		*ppv = new CWP81ProjectionClient(lpstrUsbVid);
-}
-
 //Export C-Style.
 EXTERN_C HANDLE WINAPI InitWinPhoneProjectionClient(LPCWSTR lpstrUsbVid)
 {
@@ -17,7 +10,7 @@ EXTERN_C HANDLE WINAPI InitWinPhoneProjectionClient(LPCWSTR lpstrUsbVid)
 		return p;
 	else
 	{
-		p->Release();
+		delete p;
 		return NULL;
 	}
 }
@@ -25,7 +18,14 @@ EXTERN_C HANDLE WINAPI InitWinPhoneProjectionClient(LPCWSTR lpstrUsbVid)
 EXTERN_C VOID WINAPI FreeWinPhoneProjectionClient(HANDLE p)
 {
 	if (p)
-		((CWP81ProjectionClient*)p)->Release();
+		delete (CWP81ProjectionClient*)p;
+}
+
+EXTERN_C VOID WINAPI ResetWinPhoneProjectionClient(HANDLE p)
+{
+	if (p == NULL)
+		return;
+	((CWP81ProjectionClient*)p)->Reset();
 }
 
 EXTERN_C BOOL WINAPI ReadWinPhoneScreenImageAsync(HANDLE p)
@@ -35,9 +35,15 @@ EXTERN_C BOOL WINAPI ReadWinPhoneScreenImageAsync(HANDLE p)
 	return ((CWP81ProjectionClient*)p)->ReadImageAsync();
 }
 
-EXTERN_C BOOL WINAPI WaitWinPhoneScreenImageComplete(HANDLE p,DWORD dwSizeOfBuf,PBYTE pBuffer,PUINT32 pWidth,PUINT32 pHeight,PDWORD pdwBits,PUINT pOrientation,DWORD dwTimeout,BOOL bFastCall)
+EXTERN_C BOOL WINAPI WaitWinPhoneScreenImageComplete(HANDLE p,PBYTE* ppBuffer,PUINT32 pWidth,PUINT32 pHeight,PDWORD pdwBits,PDWORD pdwStride,PUINT pOrientation,DWORD dwTimeout,BOOL bFastCall)
 {
 	if (p == NULL)
 		return FALSE;
-	return ((CWP81ProjectionClient*)p)->WaitReadImageComplete(dwSizeOfBuf,pBuffer,pWidth,pHeight,pdwBits,pOrientation,dwTimeout,bFastCall);
+	return ((CWP81ProjectionClient*)p)->WaitReadImageComplete(ppBuffer,pWidth,pHeight,pdwBits, pdwStride, pOrientation,dwTimeout,bFastCall);
+}
+EXTERN_C BOOL WINAPI SendWinPhoneTouchEvent(HANDLE p, UINT uMsg, WPARAM wParam, LPARAM lPos, LPARAM lSize, UINT Orientation)
+{
+	if (p == NULL)
+		return FALSE;
+	return ((CWP81ProjectionClient*)p)->SendTouchEvent(uMsg, wParam, lPos, lSize, Orientation);
 }

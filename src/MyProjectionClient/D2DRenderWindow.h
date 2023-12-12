@@ -20,7 +20,7 @@ protected:
 	BOOL bPaused = FALSE;
 	CRITICAL_SECTION cs;
 private:
-	PBYTE pBufOfRaw = NULL,pBufOfConverted = NULL;
+	PBYTE pBufOfConverted = NULL;
 	IWICBitmap* pRawBitmap = NULL;
 	ID2D1Bitmap* pBltBitmap = NULL;
 private:
@@ -37,6 +37,7 @@ private:
 	DWORD dwImageRawBits = 0; //no used.
 	DWORD dwImageRawStride = 0; //no used.
 	UINT Orientation = WP_ProjectionScreenOrientation_Default,PrevOrientation = WP_ProjectionScreenOrientation_Default;
+	UINT ForceOrientation = WP_ProjectionScreenOrientation_Normal;
 private:
 	IComInterfaceQueue<IWICBitmapSource>* pNotifySharedQueue = NULL;
 	HANDLE hEventRender = NULL;
@@ -51,10 +52,11 @@ public:
 	BOOL Initialize(LPWSTR lpstrUsbVid);
 	BOOL Pause();
 	BOOL Resume();
-	BOOL MoveWindow(int x,int y,DWORD dwWidth,DWORD dwHeight);
+	BOOL MoveWindow(int x,int y,DWORD dwWidth,DWORD dwHeight, BOOL bRecalc=FALSE);
 	BOOL ForceChangeOrientation(WP81ProjectionScreenOrientation ori);
 	WNDPROC SetNewWndProc(WNDPROC newproc);
 	UINT32 GetFps();
+	BOOL SendKey(UINT uMsg, WPARAM vkey);
 public:
 	VOID SetInformationRecorder(DWORD dwFps,HANDLE hEvent,IComInterfaceQueue<IWICBitmapSource>* pSharedQueue);
 	VOID ClearRecorder();

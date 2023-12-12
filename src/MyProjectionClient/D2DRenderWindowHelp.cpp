@@ -16,15 +16,16 @@ BOOL ConvertWICBitmapFormat(IWICImagingFactory* pWICFactory,REFWICPixelFormatGUI
 	return FALSE;
 }
 
-BOOL SyncReadWP16BitScreenImageWithWICBitmap(HANDLE hProjectionClient,PBYTE pBuffer,PUINT pOrientation,IWICImagingFactory* pWICFactory,IWICBitmap** ppWICBitmap,BOOL bReleaseOldWICBitmap)
+BOOL SyncReadWP16BitScreenImageWithWICBitmap(HANDLE hProjectionClient,PUINT pOrientation,IWICImagingFactory* pWICFactory,IWICBitmap** ppWICBitmap,BOOL bReleaseOldWICBitmap)
 {
 	if (ReadWinPhoneScreenImageAsync(hProjectionClient))
 	{
 		UINT nWidth = 0,nHeight = 0;
 		DWORD dwImageBits;
-		if (WaitWinPhoneScreenImageComplete(hProjectionClient,PROJECTION_CLIENT_MAX_IMAGE_BUF_SIZE,pBuffer,&nWidth,&nHeight,&dwImageBits,pOrientation,INFINITE,TRUE))
+		DWORD dwStride;
+		PBYTE pBuf;
+		if (WaitWinPhoneScreenImageComplete(hProjectionClient,&pBuf,&nWidth,&nHeight,&dwImageBits,&dwStride,pOrientation,1000,TRUE))
 		{
-			DWORD dwStride = nWidth * 2;
 			if (dwImageBits == 16)
 			{
 				if (*ppWICBitmap && bReleaseOldWICBitmap)
@@ -32,7 +33,7 @@ BOOL SyncReadWP16BitScreenImageWithWICBitmap(HANDLE hProjectionClient,PBYTE pBuf
 					(*ppWICBitmap)->Release();
 					*ppWICBitmap = NULL;
 				}
-				pWICFactory->CreateBitmapFromMemory(nWidth,nHeight,GUID_WICPixelFormat16bppBGR565,dwStride,dwStride * nHeight,pBuffer,ppWICBitmap);
+				pWICFactory->CreateBitmapFromMemory(nWidth,nHeight,GUID_WICPixelFormat16bppBGR565,dwStride,dwStride * nHeight,pBuf,ppWICBitmap);
 			}
 		}
 		return TRUE;
