@@ -171,9 +171,18 @@ BOOL CWP81ProjectionClient::WaitReadImageComplete(PBYTE* ppBuffer,PUINT32 pWidth
 			}
 			if (pdwBits)
 				*pdwBits = pData->dwImageBits;
+
+			LONG width = pData->dwUnk3;
+			if (width == NULL || width == 0) {
+				width = (pData->nImageDataLength - WP_SCREEN_TO_PC_IMAGE_DATA_OFFSET) / pData->wDisplayHeight;
+			}
+
 			if (dwPhoneStride == 0)
 			{
 				dwPhoneWidth = pData->wRawWidth;
+				if (dwPhoneWidth == NULL || dwPhoneWidth == 0) {
+					dwPhoneWidth = (pData->nImageDataLength - WP_SCREEN_TO_PC_IMAGE_DATA_OFFSET) / pData->wDisplayHeight;
+				}
 				dwPhoneHeight = pData->wRawHeight;
 				dwPhoneStride = dwPhoneWidth * 4;
 			}
@@ -185,10 +194,13 @@ BOOL CWP81ProjectionClient::WaitReadImageComplete(PBYTE* ppBuffer,PUINT32 pWidth
 				dwBitSize = 3;
 			else if (pData->dwImageBits == 32)
 				dwBitSize = 4;
+			
+			
+
 			if (pdwStride)
-				*pdwStride = pData->dwUnk3;
+				*pdwStride = width;
 			if (ppBuffer)
-				*ppBuffer = ((PBYTE)pData) + (pData->nImageDataLength - pData->dwUnk3 * pData->wDisplayHeight);
+				*ppBuffer = ((PBYTE)pData) + (pData->nImageDataLength - width * pData->wDisplayHeight);
 			bResult = TRUE;
 		}
 	}
