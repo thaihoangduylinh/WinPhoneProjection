@@ -33,6 +33,7 @@
 #define MENU_CMD_CAPTURE_TO_VIDEO_FILE_STOP (MENU_CMD + 9)
 #define MENU_CMD_CAPTURE_TO_VIDEO_FILE_USE_HARDWARE (MENU_CMD + 10)
 #define MENU_CMD_REGISTER_MFSOURCE_TO_WMP (MENU_CMD + 11)
+#define MENU_CMD_CONTROLS (MENU_CMD + 12)
 #define MENU_CMD_PHONE_DEVICE_SELECT (MENU_CMD + 1000)
 
 LPWSTR lpszPhoneDevName;
@@ -290,7 +291,7 @@ LRESULT CALLBACK MainWindowMessageProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARAM 
 				 RenderWindow->Resume();
 			}
 		}*/
-		if ((wParam == VK_BACK) || (wParam == VK_HOME))
+		if ((wParam == VK_BACK) || (wParam == 0x48) || (wParam == VK_SPACE))
 		{
 			if ((lParam & 0x40000000)==0)
 			{
@@ -299,7 +300,7 @@ LRESULT CALLBACK MainWindowMessageProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARAM 
 		}
 		break;
 	case WM_KEYUP:
-		if ((wParam == VK_BACK) || (wParam == VK_HOME))
+		if ((wParam == VK_BACK) || (wParam == 0x48) || (wParam == VK_SPACE))
 		{
 			RenderWindow->SendKey(uMsg, wParam);
 		}
@@ -313,6 +314,10 @@ LRESULT CALLBACK MainWindowMessageProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARAM 
 		case MENU_CMD_ABOUT:
 			ShellMessageBoxA(GetModuleHandle(NULL),hWnd,
 				"Author:ShanYe [K.F Yang]\nMail:chinatb361@hotmail.com\nThanks:SiYuan Lin.\nSource Code:GitHub.com/amamiya/WinPhoneProjection\n\nThis Project Implement by Reverse Engineering. (Project My Screen App - 8.10.12349)","About - rev.1",MB_OK);
+			break;
+		case MENU_CMD_CONTROLS:
+			ShellMessageBoxA(GetModuleHandle(NULL), hWnd,
+				"BackSpace: Back\nH Key: Go to Home Screen\nSpace bar: Search", "Keyboard Controls", MB_OK);
 			break;
 		case MENU_CMD_DISPLAY_AUTO:
 			CheckMenuRadioItem(hMenuDisplay,0,3,0,MF_BYPOSITION);
@@ -488,7 +493,7 @@ LRESULT CALLBACK MainWindowMessageProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARAM 
 			if (RenderWindow->Initialize(szDevPath))
 			{
 				lpszPhoneDevName = StrDupW(szDevName);
-				wsprintfW(szDevPath,L"%s - WP8.1 Projection Client",szDevName);
+				wsprintfW(szDevPath,L"%s - Windows Phone Projection Client",szDevName);
 				SetWindowTextW(hWnd,szDevPath);
 			}else{
 				wsprintfW(szDevPath,L"Unrecoverable Exception:Need to quit. (0x%08X)",RenderWindow->operator HRESULT());
@@ -503,7 +508,7 @@ LRESULT CALLBACK MainWindowMessageProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARAM 
 			WCHAR szBuffer[MAX_PATH] = {};
 			WCHAR szTimeStr[MAX_PATH] = {};
 			StrFromTimeIntervalW(szTimeStr,ARRAYSIZE(szTimeStr),GetTickCount64() - ulTickCountOK,3);
-			wsprintfW(szBuffer,L"%s - WP8.1 Projection Client [%s - FPS:%d]",lpszPhoneDevName,szTimeStr,RenderWindow->GetFps());
+			wsprintfW(szBuffer,L"%s - Windows Phone Projection Client [%s - FPS:%d]",lpszPhoneDevName,szTimeStr,RenderWindow->GetFps());
 			SetWindowTextW(hWnd,szBuffer);
 		}
 		break;
@@ -594,12 +599,13 @@ void true_main(int nCmdShow)
 	AppendMenuA(hMenuHelper,MF_BYCOMMAND,MENU_CMD_REGISTER_MFSOURCE_TO_WMP,"Install to Microsoft Media Foundation (for Windows Media Player)");
 	AppendMenuA(hMenuHelper,MF_BYCOMMAND,0,NULL);
 	AppendMenuA(hMenuHelper,MF_BYCOMMAND,MENU_CMD_ABOUT,"About...");
+	AppendMenuA(hMenuHelper, MF_BYCOMMAND, MENU_CMD_CONTROLS, "Controls");
 	AppendMenuA(MainMenu,MF_POPUP,(UINT_PTR)hMenuDevice,"Device");
 	AppendMenuA(MainMenu,MF_POPUP,(UINT_PTR)hMenuDisplay,"Display");
 	AppendMenuA(MainMenu,MF_POPUP,(UINT_PTR)hMenuCapture,"Capture");
 	AppendMenuA(MainMenu,MF_POPUP,(UINT_PTR)hMenuHelper,"Help");
 	SetMenuItemBitmaps(hMenuHelper,MENU_CMD_REGISTER_MFSOURCE_TO_WMP,MF_BYCOMMAND,hWMPBitmap,hWMPBitmap);
-	SetMenuDefaultItem(hMenuHelper,MENU_CMD_ABOUT,MF_BYCOMMAND);
+	//SetMenuDefaultItem(hMenuHelper,MENU_CMD_ABOUT,MF_BYCOMMAND);
 	CheckMenuRadioItem(hMenuDisplay,0,3,0,MF_BYPOSITION);
 	EnableMenuItem(MainMenu,1,MF_BYPOSITION|MF_GRAYED);
 	EnableMenuItem(MainMenu,2,MF_BYPOSITION|MF_GRAYED);
@@ -608,7 +614,7 @@ void true_main(int nCmdShow)
 	HICON hIcon = LoadIcon(hModuleIcon,MAKEINTRESOURCE(261));
 	FreeLibrary(hModuleIcon);
 
-	MainWindow = CreateWindowExW(WS_EX_APPWINDOW,L"#32770",L"WP8.1 Projection Client - 1.0 [ShanYe]",WS_OVERLAPPEDWINDOW,CW_USEDEFAULT,CW_USEDEFAULT,0,0,NULL,MainMenu,GetModuleHandle(NULL),NULL);
+	MainWindow = CreateWindowExW(WS_EX_APPWINDOW,L"#32770",L"Windows Phone Projection Client - [ShanYe]",WS_OVERLAPPEDWINDOW,CW_USEDEFAULT,CW_USEDEFAULT,0,0,NULL,MainMenu,GetModuleHandle(NULL),NULL);
 	RenderWindow = new CD2DRenderWindow(MainWindow);
 	RenderWindowProc = RenderWindow->SetNewWndProc(&RenderWindowMessageProc);
 	SetWindowLongPtrW(MainWindow,GWLP_WNDPROC,(LONG_PTR)&MainWindowMessageProc);

@@ -246,7 +246,19 @@ BOOL CWP81ProjectionClient::SendTouchEvent(UINT uMsg, WPARAM wParam, LPARAM lPos
 	if ((uMsg == WM_KEYDOWN)||(uMsg == WM_KEYUP))
 	{
 		send[6] = 0x00000001;
-		send[7] = (wParam == VK_BACK) ? 0 : 1;
+		//send[7] = (wParam == VK_BACK) ? 0 : 1;
+
+		switch (wParam) {
+			case VK_BACK:
+				send[7] = 0;
+				break;
+			case 0x48:
+				send[7] = 1;
+				break;
+			case VK_SPACE:
+				send[7] = 2;
+				break;
+		}
 		send[8] = (uMsg == WM_KEYDOWN) ? 1 : 0;
 	}
 	else {
